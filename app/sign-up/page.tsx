@@ -9,18 +9,22 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { signUp } from "@/lib/auth/auth-client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function SignUp() {
-  const [ name, setName ] = useState("");
-  const [ email, setEmail ] = useState("");
-  const [ password, setPassword ] = useState("");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
-  const [ error, setError ] = useState("");
-  const [ loading, setLoading ] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const router = useRouter();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -28,8 +32,18 @@ export default function SignUp() {
     setError("");
     setLoading(true);
 
-    try{
+    try {
+      const result = await signUp.email({
+        name,
+        email,
+        password,
+      });
 
+      if (result.error) {
+        setError(result.error.message ?? "Failed to sign up");
+      } else {
+        router.push("/dashboard");
+      }
     } catch (err) {
       setError("An unexpected error occurred");
     } finally {
@@ -50,6 +64,11 @@ export default function SignUp() {
         </CardHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <CardContent className="space-y-4">
+            {error && (
+              <div className="bg-destructive/15 text-destructive rounded-md p-3 text-sm">
+                {error}
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="name" className="text-gray-700">
                 Name
@@ -97,8 +116,9 @@ export default function SignUp() {
             <Button
               type="submit"
               className="bg-primary hover:bg-primary/90 w-full"
+              disabled={loading}
             >
-              Sign Up
+              {loading ? "Creating account..." : "Sign Up"}
             </Button>
             <p className="text-center text-sm text-gray-600">
               Already have an account?{" "}

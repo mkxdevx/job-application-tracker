@@ -1,6 +1,6 @@
 "use client";
 
-import { Board, Column, JobApplication, } from "@/lib/models/models.types";
+import { Board, Column, JobApplication } from "@/lib/models/models.types";
 import {
   Award,
   Calendar,
@@ -19,9 +19,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { Button } from "@base-ui/react";
 import CreateJobApplicationDialog from "./create-job-dialog";
 import JobApplicationCard from "./job-application-card";
+import { Button } from "./ui/button";
+import { useBoard } from "@/lib/hooks/use-boards";
 
 interface KanbanBoardProps {
   board: Board;
@@ -85,7 +86,7 @@ function DroppableColumn({
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
-                <Button className="h-6 w-6 text-white hover:bg-white/20">
+                <Button variant="ghost" size="icon" className="h-6 w-6 text-white hover:bg-white/20">
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               }
@@ -117,12 +118,22 @@ function DroppableColumn({
   );
 }
 
-function SortableJobCard({ job, columns }: { job: JobApplication; columns: Column[] }) {
-  return <div><JobApplicationCard job={job} columns={columns} /></div>;
+function SortableJobCard({
+  job,
+  columns,
+}: {
+  job: JobApplication;
+  columns: Column[];
+}) {
+  return (
+    <div>
+      <JobApplicationCard job={job} columns={columns} />
+    </div>
+  );
 }
 
 export default function KanbanBoard({ board, userId }: KanbanBoardProps) {
-  const columns = board.columns;
+  const { columns, moveJob } = useBoard(board);
 
   const sortedColumns = columns?.sort((a, b) => a.order - b.order) || [];
 

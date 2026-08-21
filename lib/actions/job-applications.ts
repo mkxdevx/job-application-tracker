@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { getSession } from "../auth/auth";
 import connectDB from "../db";
 import { Board, Column, JobApplication } from "../models";
-import { Over_the_Rainbow } from "next/font/google";
 
 interface JobApplicationData {
   company: string;
@@ -91,14 +90,14 @@ export async function createJobApplication(data: JobApplicationData) {
 export async function updateJobApplication(
   id: string,
   updates: {
-    company: string;
-    position: string;
+    company?: string;
+    position?: string;
     location?: string;
     notes?: string;
     salary?: string;
     jobUrl?: string;
-    columnId: string;
-    order: number;
+    columnId?: string;
+    order?: number;
     tags?: string[];
     description?: string;
   },
@@ -146,11 +145,10 @@ export async function updateJobApplication(
         jobApplications: id,
       },
     });
-    const jobsInTargetColumn = await jobApplication
-      .find({
-        columnId: newColumnId,
-        _id: { $ne: id },
-      })
+    const jobsInTargetColumn = await JobApplication.find({
+      columnId: newColumnId,
+      _id: { $ne: id },
+    })
       .sort({ order: 1 })
       .lean();
 
@@ -177,14 +175,13 @@ export async function updateJobApplication(
     updatesToApply.order = newOrderValue;
 
     await Column.findByIdAndUpdate(newColumnId, {
-      $push: { jobApplication: id },
+      $push: { jobApplications: id },
     });
   } else if (order !== undefined && order !== null) {
-    const otherJobsInColumn = await jobApplication
-      .find({
-        columnId: currentColumnId,
-        _id: { $ne: id },
-      })
+    const otherJobsInColumn = await JobApplication.find({
+      columnId: currentColumnId,
+      _id: { $ne: id },
+    })
       .sort({ order: 1 })
       .lean();
 
@@ -199,7 +196,7 @@ export async function updateJobApplication(
 
     const newOrderValue = order * 100;
 
-    if( order < oldPositionIndex) {
+    if (order < oldPositionIndex) {
       const jobsToShiftDown = otherJobsInColumn.slice(order, oldPositionIndex);
 
       for (const job of jobsToShiftDown) {
@@ -219,9 +216,38 @@ export async function updateJobApplication(
     updatesToApply.order = newOrderValue;
   }
 
-  const updated = await JobApplication.findByIdAndUpdate( id, updatesToApply, {
-    new: true, 
+  const updated = await JobApplication.findByIdAndUpdate(id, updatesToApply, {
+    new: true,
   });
 
-  return { data:JSON.parse(JSON.stringify(updated)) };
+  revalidatePath("/dashboard");
+  return { data: JSON.parse(JSON.stringify(updated)) };
+}
+
+export async function deleteJobApplication(id: string) {
+  const session = await getSession();
+
+  if (!session?.user) {
+    return { error: "Unauthorized" };
+  }
+
+  const jobApplication = await JobApplication.findById(id);
+
+  if (!jobApplication) {
+    return { error: "Job application not found" };
+  }
+
+  if (jobApplication.userId !== session.user.id) {
+    return { error: "Unauthorized" };
+  }
+
+  await Column.findByIdAndUpdate(jobApplication.columnId, {
+    $pull: { jobApplications: id },
+  });
+
+  await JobApplication.deleteOne({ _id: id });
+
+  revalidatePath("/dashboard");
+
+  return { success: true };
 }

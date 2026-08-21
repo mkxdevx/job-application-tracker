@@ -23,6 +23,10 @@ import CreateJobApplicationDialog from "./create-job-dialog";
 import JobApplicationCard from "./job-application-card";
 import { Button } from "./ui/button";
 import { useBoard } from "@/lib/hooks/use-boards";
+import { DragDropProvider, useDroppable } from "@dnd-kit/react";
+import { DragEndEvent, PointerActivationConstraints, PointerSensor } from "@dnd-kit/dom";
+import { useSortable } from "@dnd-kit/react/sortable";
+import { useState } from "react";
 
 interface KanbanBoardProps {
   board: Board;
@@ -68,6 +72,14 @@ function DroppableColumn({
   boardId: string;
   sortedColumns: Column[];
 }) {
+  const { ref, isDropTarget } = useDroppable({
+    id: column._id,
+    data: {
+      type: "column",
+      columnId: column._id,
+    },
+  });
+
   const sortedJobs =
     column.jobApplications?.sort((a, b) => a.order - b.order) || [];
 
@@ -86,7 +98,11 @@ function DroppableColumn({
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
-                <Button variant="ghost" size="icon" className="h-6 w-6 text-white hover:bg-white/20">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-white hover:bg-white/20"
+                >
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               }
@@ -104,10 +120,14 @@ function DroppableColumn({
           </DropdownMenu>
         </div>
       </CardHeader>
-      <CardContent className="min-h-100 space-y-2 rounded-b-lg bg-gray-50/50 pt-4">
-        {sortedJobs.map((job, key) => (
+      <CardContent
+        ref={ref}
+        className={`min-h-100 space-y-2 rounded-b-lg bg-gray-50/50 pt-4 ${isDropTarget && "ring-2 ring-blue-500"}`}
+      >
+        {sortedJobs.map((job, index) => (
           <SortableJobCard
-            key={key}
+            key={job._id}
+            index={index}
             job={{ ...job, columnId: job.columnId || column._id }}
             columns={sortedColumns}
           />
@@ -121,26 +141,63 @@ function DroppableColumn({
 function SortableJobCard({
   job,
   columns,
+  index,
 }: {
   job: JobApplication;
   columns: Column[];
+  index: number;
 }) {
+  const { isDragging, ref, handleRef } = useSortable({
+    id: job._id,
+    index: index,
+    data: {
+      type: "job",
+      job,
+    },
+  });
+
+  const style = {
+    opacity: isDragging ? 0.5 : 1,
+  };
+
   return (
-    <div>
-      <JobApplicationCard job={job} columns={columns} />
+    <div ref={ref} style={style}>
+      <JobApplicationCard
+        job={job}
+        columns={columns}
+        dragHandleRef={handleRef}
+      />
     </div>
   );
 }
 
 export default function KanbanBoard({ board, userId }: KanbanBoardProps) {
+  const [ activeId, setActiveId ] = useState<String | null>(null);
   const { columns, moveJob } = useBoard(board);
 
   const sortedColumns = columns?.sort((a, b) => a.order - b.order) || [];
 
+  const sensors = [
+    PointerSensor.configure({
+      activationConstraints: [
+        new PointerActivationConstraints.Distance({
+          value: 8,
+        }),
+      ],
+    }),
+  ];
+
+  // async function handleDragEnd(event: DragEndEvent) {
+  //   const { active, over } = event
+  // }
+
   return (
-    <>
-      <div>
-        <div>
+    <DragDropProvider
+      sensors={sensors}
+      // onDragEnd={handleDragEnd}
+    >
+      <div className="space-y-4">
+        <div className="flex gap-4 overflow-x-auto pb-4">
           {columns.map((col, key) => {
             const config = COLUMN_CONFIG[key] || {
               color: "bg-gray-500",
@@ -158,6 +215,6 @@ export default function KanbanBoard({ board, userId }: KanbanBoardProps) {
           })}
         </div>
       </div>
-    </>
+    </DragDropProvider>
   );
 }

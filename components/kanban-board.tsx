@@ -23,7 +23,7 @@ import CreateJobApplicationDialog from "./create-job-dialog";
 import JobApplicationCard from "./job-application-card";
 import { Button } from "./ui/button";
 import { useBoard } from "@/lib/hooks/use-boards";
-import { DragDropProvider, useDroppable } from "@dnd-kit/react";
+import { DragDropProvider, DragOverlay, useDroppable } from "@dnd-kit/react";
 import {
   DragEndEvent,
   DragStartEvent,
@@ -156,6 +156,7 @@ function SortableJobCard({
   const { isDragging, ref, handleRef } = useSortable({
     id: job._id,
     index: index,
+    group: "jobApplications",
     data: {
       type: "job",
       job,
@@ -167,7 +168,7 @@ function SortableJobCard({
   };
 
   return (
-    <div ref={ref} style={style}>
+    <div ref={ref} style={style} key={`${job._id}-${index}`}>
       <JobApplicationCard
         job={job}
         columns={columns}
@@ -178,6 +179,7 @@ function SortableJobCard({
 }
 
 export default function KanbanBoard({ board, userId }: KanbanBoardProps) {
+  const [activeId, setActiveId] = useState<String | null>(null);
   const { columns, moveJob } = useBoard(board);
 
   const sortedColumns = columns?.sort((a, b) => a.order - b.order) || [];
@@ -192,12 +194,18 @@ export default function KanbanBoard({ board, userId }: KanbanBoardProps) {
     }),
   ];
 
-  async function handleDragEnd(event: any) {
+  async function handleDragStart(event: DragStartEvent) {
+    if (!event.operation.source) return;
+    setActiveId(event.operation.source.id as String);
+  }
+
+  async function handleDragEnd(event: DragEndEvent) {
+    setActiveId(null);
     const { source, target } = event.operation;
 
     if (!target || !board._id) return;
 
-    const activeId = source.id as string;
+    const activeId = source?.id as string;
     const overId = target.id as string;
 
     let draggedJob: JobApplication | null = null;
@@ -205,7 +213,8 @@ export default function KanbanBoard({ board, userId }: KanbanBoardProps) {
     let sourceIndex = -1;
 
     for (const column of sortedColumns) {
-      const jobs = column.jobApplications || [];
+      const jobs =
+        column.jobApplications.sort((a, b) => a.order - b.order) || [];
       const jobIndex = jobs.findIndex((j) => j._id === activeId);
       if (jobIndex !== -1) {
         draggedJob = jobs[jobIndex];
@@ -217,11 +226,11 @@ export default function KanbanBoard({ board, userId }: KanbanBoardProps) {
 
     if (!draggedJob || !sourceColumn) return;
 
-    // check if dropped in a column or another job
+    //   // check if dropped in a column or another job
     const targetColumn = sortedColumns.find((col) => col._id === overId);
     const targetJob = sortedColumns
       .flatMap((col) => col.jobApplications || [])
-      .find((j) => j._id === overId);
+      .find((job) => job._id === overId);
 
     let targetColumnId: string;
     let newOrder: number;
@@ -230,7 +239,8 @@ export default function KanbanBoard({ board, userId }: KanbanBoardProps) {
       targetColumnId = targetColumn._id;
       const jobsInTarget =
         targetColumn.jobApplications
-          .filter((j) => j._id !== activeId) || [];
+          .filter((j) => j._id !== activeId)
+          .sort((a, b) => a.order - b.order) || [];
       newOrder = jobsInTarget.length;
     } else if (targetJob) {
       const targetJobColumn = sortedColumns.find((col) =>
@@ -246,7 +256,7 @@ export default function KanbanBoard({ board, userId }: KanbanBoardProps) {
       if (!targetColumnObj) return;
 
       const allJobsInTargetOriginal =
-        targetColumnObj.jobApplications || [];
+        targetColumnObj.jobApplications.sort((a, b) => a.order - b.order) || [];
       const allJobsInTargetFiltered =
         allJobsInTargetOriginal.filter((j) => j._id !== activeId) || [];
 
@@ -279,6 +289,10 @@ export default function KanbanBoard({ board, userId }: KanbanBoardProps) {
     await moveJob(activeId, targetColumnId, newOrder);
   }
 
+  const activeJob = sortedColumns
+    .flatMap((col) => col.jobApplications || [])
+    .find((job) => job._id === activeId);
+
   return (
     <DragDropProvider sensors={sensors} onDragEnd={handleDragEnd}>
       <div className="space-y-4">
@@ -300,6 +314,13 @@ export default function KanbanBoard({ board, userId }: KanbanBoardProps) {
           })}
         </div>
       </div>
+      <DragOverlay>
+        {activeJob ? (
+          <div className="opacity-50">
+            <JobApplicationCard job={activeJob} columns={sortedColumns} />
+          </div>
+        ) : null}
+      </DragOverlay>
     </DragDropProvider>
   );
 }

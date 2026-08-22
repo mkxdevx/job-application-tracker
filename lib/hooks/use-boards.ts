@@ -8,14 +8,13 @@ export function useBoard(initialBoard?: Board | null) {
   const [board, setBoard] = useState<Board | null>(initialBoard || null);
   const [columns, setColumns] = useState<Column[]>(initialBoard?.columns || []);
   const [error, setError] = useState<string | null>(null);
-  const boardId = initialBoard?._id
 
   useEffect(() => {
     if (initialBoard) {
       setBoard(initialBoard);
       setColumns(initialBoard.columns || []);
     }
-  }, [boardId]);
+  }, [initialBoard]);
 
   async function moveJob(
     jobApplicationId: string,
@@ -34,20 +33,20 @@ export function useBoard(initialBoard?: Board | null) {
 
       for (const col of newColumns) {
         const jobIndex = col.jobApplications.findIndex(
-          (j) => j._id === jobApplicationId,
+          (j) => j._id === jobApplicationId
         );
         if (jobIndex !== -1 && jobIndex !== undefined) {
           jobToMove = col.jobApplications[jobIndex];
           oldColumnId = col._id;
           col.jobApplications = col.jobApplications.filter(
-            (job) => job._id !== jobApplicationId,
+            (job) => job._id !== jobApplicationId
           );
           break;
         }
       }
       if (jobToMove && oldColumnId) {
         const targetColumnIndex = newColumns.findIndex(
-          (col) => col._id === newColumnId,
+          (col) => col._id === newColumnId
         );
         if (targetColumnIndex !== -1) {
           const targetColumn = newColumns[targetColumnIndex];
@@ -69,9 +68,8 @@ export function useBoard(initialBoard?: Board | null) {
             jobApplications: jobsWithUpdatedOrders,
           };
         }
-        return newColumns;
       }
-      return prev;
+      return newColumns;
     });
 
     try {
@@ -79,9 +77,6 @@ export function useBoard(initialBoard?: Board | null) {
         columnId: newColumnId,
         order: newOrder,
       });
-      if(result && "data" in result && result.data && result.data.columns) {
-        setColumns(result.data.columns)
-      }
     } catch (err) {
       console.error("Error", err);
       setError("Failed to move job");

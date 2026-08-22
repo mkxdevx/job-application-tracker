@@ -38,7 +38,7 @@ import { useState } from "react";
 interface JobApplicationCardProps {
   job: JobApplication;
   columns: Column[];
-  dragHandleRef: (element: Element | null) => void;
+  dragHandleRef?: (element: Element | null) => void;
 }
 
 export default function JobApplicationCard({
